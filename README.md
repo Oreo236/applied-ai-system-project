@@ -23,7 +23,7 @@ Some prompts to answer:
 
 - What features does each `Song` use in your system
   - For example: genre, mood, energy, tempo
-  - genre, mood, energy, acousticness, valence, tempo_bpm and danceability
+  - genre, mood, energy, acousticness, valence, tempo_bpm,  danceability, popularity, release_decade, detailed_mood, instrumentalness, livenesss
 - What information does your `UserProfile` store
   - favorite genre, favorite mood, energy and likes acoustic
 - How does your `Recommender` compute a score for each song
@@ -220,3 +220,35 @@ A few sentences about what you learned:
 - How did building this change how you think about real music recommenders
 - Where do you think human judgment still matters, even if the model seems "smart"
 
+
+Pictures:
+
+### Baseline — pop / happy / energy 0.8 (original scorer, max 9.5)
+![Baseline pop/happy/0.8 terminal output showing top 5 recommendations scored out of 9.5](pictures/Screenshot%202026-04-15%20at%201.28.59%20AM.png)
+
+### Baseline 2 — pop / happy / 0.85 and Baseline 3 — lofi / chill / acoustic
+![VS Code terminal showing baseline 2 pop/happy results and start of lofi/chill profile](pictures/Screenshot%202026-04-15%20at%201.41.11%20AM.png)
+
+### Baseline 3 — lofi / chill / acoustic and Baseline 4 — rock / intense
+![Terminal output for lofi chill acoustic profile and rock intense profile](pictures/Screenshot%202026-04-15%20at%201.41.18%20AM.png)
+
+### Baseline 4 — rock / intense and ADV 1 — mood 'sad' not in catalog
+![Rock intense results and start of adversarial profile with missing mood label](pictures/Screenshot%202026-04-15%20at%201.41.25%20AM.png)
+
+### ADV 1 — missing mood and ADV 2 — high energy lofi conflict
+![ADV 1 sad mood scoring zero on mood dimension and ADV 2 lofi genre with energy 0.9](pictures/Screenshot%202026-04-15%20at%201.41.30%20AM.png)
+
+### ADV 2 — lofi energy conflict and ADV 3 — out-of-range energy 1.5
+![ADV 2 showing lofi filter bubble and ADV 3 showing negative energy scores from out-of-range input](pictures/Screenshot%202026-04-15%20at%201.41.34%20AM.png)
+
+### ADV 3 — out-of-range energy and ADV 4 — wrong capitalisation
+![ADV 3 energy 1.5 results and ADV 4 showing Pop/Happy capitalisation breaking genre and mood match](pictures/Screenshot%202026-04-15%20at%201.41.38%20AM.png)
+
+### ADV 4 — capitalisation fix and ADV 5 — genre 'metal' absent from catalog
+![ADV 4 after case-insensitive fix and ADV 5 showing metal genre with hardcoded valence bias](pictures/Screenshot%202026-04-15%20at%201.41.41%20AM.png)
+
+### ADV 5 — metal/angry results and ADV 6 — empty profile
+![ADV 5 metal angry profile and start of ADV 6 empty profile ranked only by hardcoded valence](pictures/Screenshot%202026-04-15%20at%201.41.45%20AM.png)
+
+### ADV 6 — empty profile (valence-only ranking)
+![ADV 6 empty profile showing all songs scored purely by proximity to hardcoded valence target 0.70](pictures/Screenshot%202026-04-15%20at%201.41.48%20AM.png)
