@@ -2,6 +2,9 @@
 
 A Streamlit application that combines a deterministic content-based scoring engine with a large language model to recommend songs from a catalog using natural language. The system supports two AI-powered interaction modes — a retrieval-augmented generation (RAG) chat and an autonomous agentic workflow — plus a built-in reliability and evaluation suite.
 
+**Video walkthrough:** [Watch on Loom](https://www.loom.com/share/805a1b0cd8924fdeb020b80452bb4aca)  
+**Source code:** [GitHub](https://github.com/Oreo236/applied-ai-system-project)
+
 ---
 
 ## Original Project (Modules 1–3)
@@ -157,3 +160,11 @@ The most surprising result was the empty-profile case. With no preferences provi
 The most helpful contribution from AI (Claude) during this project was migrating the tool-use agent from the Anthropic SDK format to Groq's OpenAI-compatible format. The tool definitions, conversation history structure, and function response format are all different between the two APIs, and having those translated correctly in one pass — including the `_deep_dict` helper for converting proto types from the Gemini SDK — saved significant debugging time.
 
 The clearest instance where AI suggestions were flawed was the model selection for the Groq agent. The first suggestion (`gemini-1.5-flash`) returned a 404 because the installed SDK version used an incompatible API endpoint. The second suggestion (`gemini-2.0-flash`) had a free-tier quota of exactly zero. The third suggestion (`gemini-2.0-flash-lite`) also had zero quota. After switching to Groq, `llama3-groq-70b-8192-tool-use-preview` was suggested as the tool-use model — and it had already been decommissioned. Each of these failures required looking at the actual API error, not accepting the suggestion at face value. The lesson is that AI-generated model names and API details go stale quickly and always need to be verified against current provider documentation.
+
+---
+
+## Portfolio
+
+**What this project says about me as an AI engineer:**
+
+This project shows that I can build AI systems that are more than a wrapper around an API call. I started with a hand-written scoring engine, understood its failure modes through adversarial testing, and then extended it into a full RAG pipeline and an agentic workflow — keeping the deterministic core as the retrieval layer so the LLM could never hallucinate results. When three different API providers failed in a row due to quota limits, deprecations, and version mismatches, I debugged each one from the error message up rather than giving up. I care about reliability: the system logs every session, tests every profile consistently, and surfaces its reasoning transparently so failures are visible rather than silent. That combination — understanding the math behind the model, knowing when to trust AI tooling and when to verify it, and building in ways to catch problems before users do — is how I want to approach engineering work.
