@@ -1,30 +1,54 @@
 flowchart TD
-    A([User Preferences\ngenre · mood · energy · likes_acoustic])
-    B([data/songs.csv · 18 songs])
+    USER([User\nnatural-language query])
 
-    A --> REC
-    B --> LOAD[load_songs\nparse CSV rows into dicts]
-    LOAD --> REC
+    USER -->|RAG Chat tab| RAG_FLOW
+    USER -->|Agent Mode tab| AGENT_FLOW
 
-    REC[recommend_songs\nloop over every song in catalog]
-    REC --> SCORE
-
-    subgraph SCORE["score_song(user_prefs, song)"]
+    subgraph RAG_FLOW["RAG Pipeline"]
         direction TB
-        S1["genre match? · +3.0 if exact, else 0"]
-        S2["mood match? · +2.5 if exact, else 0"]
-        S3["energy proximity\n1 − |song.energy − user.energy|² × 2.0"]
-        S4["acousticness proximity\n1 − |song.acoustic − target|² × 1.5"]
-        S5["valence proximity\n1 − |song.valence − 0.70|² × 0.5"]
-        SUM["sum all terms · max = 9.5"]
-        REASONS["collect reason strings"]
-        S1 & S2 & S3 & S4 & S5 --> SUM
-        SUM --> REASONS
+        P1[LLM: Parse Preferences\nextract genre · mood · energy from text]
+        P2[Content-Based Scorer\nscore every song against preferences]
+        P3[LLM: Generate Response\ndescribe retrieved songs in plain English]
+        P1 --> P2 --> P3
     end
 
-    REASONS --> COLLECT["append song, score, reasons\nto scored list"]
-    COLLECT --> MORE{"more songs?"}
-    MORE -- yes --> SCORE
-    MORE -- no --> SORT["sort by score descending"]
-    SORT --> TOPK["take top k"]
-    TOPK --> OUT["output: title · score · explanation"]
+    subgraph AGENT_FLOW["Agentic Pipeline"]
+        direction TB
+        A1[LLM Tool-Use Loop\nllama-3.3-70b-versatile]
+        A2[get_recommendations\nrun content-based scorer]
+        A3[evaluate_diversity\ngenre count · mood count · energy range]
+        A4{diversity_score ≥ 2.0?}
+        A5[search_songs\nexplore underrepresented genres/moods]
+        A6[Final Narrative Response]
+        A1 --> A2 --> A3 --> A4
+        A4 -- yes --> A6
+        A4 -- no --> A5 --> A2
+    end
+
+    CATALOG[(data/songs.csv\n18 songs)]
+    LOGGER[(logs/sessions.jsonl\nquery · prefs · recs · metadata)]
+
+    CATALOG --> P2
+    CATALOG --> A2
+    CATALOG --> A5
+
+    P3 -->|recommendations + explanation| USER
+    A6 -->|final answer + tool trace| USER
+
+    P3 --> LOGGER
+    A6 --> LOGGER
+
+    subgraph TESTING["Reliability and Evaluation"]
+        direction TB
+        T1[16-Profile Benchmark Suite\navg score · genre spread · coverage]
+        T2[Consistency Check\n3 identical runs · must match]
+        T3[pytest unit tests\ntests/test_recommender.py]
+        T4[Session Coverage Stats\nunique songs surfaced across logs]
+    end
+
+    CATALOG --> T1
+    CATALOG --> T2
+    CATALOG --> T3
+    LOGGER --> T4
+
+    TESTING -->|results reviewed| HUMAN([Human Reviewer\nReliability tab / CI])

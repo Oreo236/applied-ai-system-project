@@ -1,254 +1,159 @@
-# 🎵 Music Recommender Simulation
+# AI Music Recommender
 
-## Project Summary
-
-In this project you will build and explain a small music recommender system.
-
-Your goal is to:
-
-- Represent songs and a user "taste profile" as data
-- Design a scoring rule that turns that data into recommendations
-- Evaluate what your system gets right and wrong
-- Reflect on how this mirrors real world AI recommenders
-
-Replace this paragraph with your own summary of what your version does.
+A Streamlit application that combines a deterministic content-based scoring engine with a large language model to recommend songs from a catalog using natural language. The system supports two AI-powered interaction modes — a retrieval-augmented generation (RAG) chat and an autonomous agentic workflow — plus a built-in reliability and evaluation suite.
 
 ---
 
-## How The System Works
-Explain your design in plain language.
-Real-world recommenders like Spotify combine two strategies: collaborative filtering (learning from what millions of similar users played) and content-based filtering (matching songs by their audio attributes). This  focuses entirely on content-based filtering: no play history, no user comparisons, just a direct match between a song's measurable traits and a user's stated preferences.
+## Original Project (Modules 1–3)
 
-Some prompts to answer:
-
-- What features does each `Song` use in your system
-  - For example: genre, mood, energy, tempo
-  - genre, mood, energy, acousticness, valence, tempo_bpm,  danceability, popularity, release_decade, detailed_mood, instrumentalness, livenesss
-- What information does your `UserProfile` store
-  - favorite genre, favorite mood, energy and likes acoustic
-- How does your `Recommender` compute a score for each song
-  - score = genre_match × 3.0
-      + mood_match  × 2.5
-      + (1 - |song.energy - user.target_energy|²)       × 2.0
-      + (1 - |song.acousticness - user.target_acoustic|²) × 1.5
-      + (1 - |song.valence - 0.70|²)                    × 0.5
-      Features such as genre and mood are an exact match. Other features use a squared proximity formula so scores of 1.0 for a perfect match, curving steeply down as distance grows. Maximum possible score is 9.5.
-      One bias that I realized from what the ai gave me was that the valence term uses a hardcoded target of 0.7, meaning the system always steers toward moderately positive songs regardless of what the user actually wants. A user who prefers dark or melancholic music will be silently penalized, since they have no way to set their own valence preference.
-- How do you choose which songs to recommend
- - Every song in the catalog/ song file would be scored, then sorted, and the top k songs with their scores and explanations will be recommended.
-
-
-You can include a simple diagram or bullet list if helpful.
+The original project, **EnergyMatch 1.0**, was a pure content-based music recommender built without any LLM. It represented songs as structured data objects and scored them against a user profile using a weighted formula across genre, mood, energy, and acousticness. Its goal was to explore how far deterministic scoring rules could go in capturing musical taste, and to expose where those rules break down — for example, when a user's genre label doesn't exist in the catalog, or when their preferences conflict (high energy + lofi aesthetic). That foundation — the `score_song` function in `src/recommender.py` — is still the retrieval engine powering the RAG and Agent pipelines in this extended system.
 
 ---
 
-## Getting Started
+## Architecture Overview
 
-### Setup
+The system has two AI-powered processing paths and a shared evaluation layer.
 
-1. Create a virtual environment (optional but recommended):
+**RAG Pipeline (RAG Chat tab)**
+A user's natural-language query is sent to an LLM (Groq `llama-3.1-8b-instant`) which extracts structured preferences (genre, mood, energy, etc.) as JSON. Those preferences are passed to the deterministic content-based scorer, which ranks every song in the catalog and returns the top five. A second LLM call uses those retrieved songs as context to write a warm, conversational response. The LLM never invents songs — it only describes what the scorer returned.
 
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate      # Mac or Linux
-   .venv\Scripts\activate         # Windows
+**Agentic Pipeline (Agent Mode tab)**
+A second, more capable model (`llama-3.3-70b-versatile`) operates in a tool-use loop with three tools: `get_recommendations`, `evaluate_diversity`, and `search_songs`. It autonomously calls these tools, checks whether its results are diverse enough (diversity score ≥ 2.0), and broadens its search if not — before writing a final narrative answer. Every tool call is logged in a visible trace.
 
-2. Install dependencies
+**Reliability & Evaluation**
+A dedicated tab runs a 16-profile benchmark suite, a consistency checker (three identical runs must produce identical results), and session coverage statistics drawn from the session log. Unit tests in `tests/test_recommender.py` cover the core scoring and data model.
+
+![System Diagram](assets/flowchart.png)
+
+---
+
+## Setup Instructions
+
+**Prerequisites:** Python 3.11+, a [Groq API key](https://console.groq.com) (free tier).
 
 ```bash
+# 1. Clone the repository
+git clone <your-repo-url>
+cd applied-ai-system-project
+
+# 2. Create and activate a virtual environment (recommended)
+python -m venv .venv
+source .venv/bin/activate        # Mac / Linux
+.venv\Scripts\activate           # Windows
+
+# 3. Install dependencies
 pip install -r requirements.txt
+
+# 4. Add your Groq API key
+echo "GROQ_API_KEY=your_key_here" > .env
+
+# 5. Run the app
+streamlit run src/app.py
 ```
 
-3. Run the app:
+The app opens at `http://localhost:8501`. The Reliability tab works without an API key; the RAG Chat and Agent Mode tabs require a valid `GROQ_API_KEY`.
 
+**Run tests only (no API key needed):**
 ```bash
-python -m src.main
+PYTHONPATH=. pytest -v
 ```
 
-### Running Tests
+---
 
-Run the starter tests with:
+## Sample Interactions
 
-```bash
-pytest
+### 1. RAG Chat — emotional request
+
+**Input:** `I am sad and need something to cry to`
+
+**Parsed preferences:**
+```json
+{ "mood": "melancholic", "energy": 0.3, "likes_acoustic": true }
 ```
 
-You can add more tests in `tests/test_recommender.py`.
+**Retrieved songs:** Library Rain (lofi/chill, score 7.2), Midnight Coding (lofi/focused, 6.8), Coffee Shop Stories (jazz/relaxed, 6.1)
+
+**Model response:**
+> Library Rain is a gentle lofi track with a soft, watery texture that gives sadness space to breathe — its low energy and high acousticness make it feel like a quiet room on a rainy afternoon. Midnight Coding shares that same unhurried pace, with a muted piano loop that sits well with introspective moods. Coffee Shop Stories leans a little warmer with its jazz undertones, but its relaxed energy keeps it in the same emotional neighborhood.
 
 ---
 
-## Experiments You Tried
+### 2. RAG Chat — activity-based request
 
-Use this section to document the experiments you ran. For example:
+**Input:** `something energetic for a workout`
 
-- What happened when you changed the weight on genre from 2.0 to 0.5
-- What happened when you added tempo or valence to the score
-- How did your system behave for different types of users
+**Parsed preferences:**
+```json
+{ "genre": "edm", "mood": "energetic", "energy": 0.9, "likes_acoustic": false }
+```
 
----
+**Retrieved songs:** Neon Grid (edm/euphoric, score 9.1), Gym Hero (pop/intense, 7.8), Storm Runner (rock/intense, 7.2)
 
-## Limitations and Risks
-
-Summarize some limitations of your recommender.
-
-Examples:
-
-- It only works on a tiny catalog
-- It does not understand lyrics or language
-- It might over favor one genre or mood
-
-You will go deeper on this in your model card.
+**Model response:**
+> Neon Grid is the obvious anchor for a workout playlist — its euphoric EDM build and near-maximum energy score make it built for the last set of a session. Gym Hero brings a pop/intense crossover feel that works well for steady-state cardio, with enough drive to keep momentum without overwhelming. Storm Runner adds a harder rock edge for anyone who wants something with a little more aggression in the mix.
 
 ---
 
-## Reflection
+### 3. Agent Mode — diversity check triggered
 
-Read and complete `model_card.md`:
+**Input:** `chill music for studying, nothing too mainstream`
 
-[**Model Card**](model_card.md)
+**Tool trace:**
+- Step 1: `get_recommendations` → `{genre: "lofi", mood: "chill", likes_popular: false}`
+- Step 2: `evaluate_diversity` → `diversity_score: 1.2` (homogeneous — 3 lofi songs)
+- Step 3: `search_songs` → finds ambient and jazz songs
+- Step 4: `get_recommendations` → broadened preferences, includes ambient/jazz
 
-Write 1 to 2 paragraphs here about what you learned:
-
-- about how recommenders turn data into predictions
-- about where bias or unfairness could show up in systems like this
-
-
----
-
-## 7. `model_card_template.md`
-
-Combines reflection and model card framing from the Module 3 guidance. :contentReference[oaicite:2]{index=2}  
-
-```markdown
-# 🎧 Model Card - Music Recommender Simulation
-
-## 1. Model Name
-
-Give your recommender a name, for example:
-
-> VibeFinder 1.0
+**Agent response:**
+> For focused studying away from the mainstream, I pulled from a few different corners of the catalog. Library Rain and Midnight Coding anchor the list with the classic lofi-chill sound — quiet and repetitive in the best way. I also brought in Floating Leaves (ambient/peaceful) and Coffee Shop Stories (jazz/relaxed) to add some variety after noticing the first pass was a little too uniform. All four share the same low-energy, non-intrusive quality that tends to work best for sustained concentration.
 
 ---
 
-## 2. Intended Use
+## Design Decisions
 
-- What is this system trying to do
-- Who is it for
+**Why keep the deterministic scorer as the retrieval engine?**
+Having a fixed, reproducible scorer means the AI's job is only natural language understanding and explanation — not inventing facts about songs. The LLM cannot hallucinate a track or misreport its energy level because it only sees what the scorer returns. This separation also makes the system fully testable: the retrieval step can be benchmarked without any API calls.
 
-Example:
+**Why Groq instead of the Anthropic or Gemini APIs?**
+The project originally used Claude (Anthropic). During development, it was migrated to the Gemini API for cost reasons, but the free-tier quota allocation for Google Cloud project keys was zero across all tested models, making the key unusable without paid credits. Groq provides a genuinely free tier (1,500+ requests/day) with low-latency inference on open-weight models, which fit the project's constraints better.
 
-> This model suggests 3 to 5 songs from a small catalog based on a user's preferred genre, mood, and energy level. It is for classroom exploration only, not for real users.
+**Why two different models for RAG vs. Agent?**
+The RAG pipeline uses `llama-3.1-8b-instant` — a smaller, faster model — because the tasks (preference parsing and response generation) are straightforward and latency matters in a chat interface. The Agent pipeline uses `llama-3.3-70b-versatile` because reliable multi-step tool use requires a more capable model to maintain the correct function-calling format across several turns.
 
----
-
-## 3. How It Works (Short Explanation)
-
-Describe your scoring logic in plain language.
-
-- What features of each song does it consider
-- What information about the user does it use
-- How does it turn those into a number
-
-Try to avoid code in this section, treat it like an explanation to a non programmer.
+**Trade-offs:**
+- The catalog is only 18 songs. With so few options per genre, the scorer can surface the "best" result quickly, but the recommendations are repetitive for anyone who uses the app more than a few times.
+- The agent's diversity check uses a simple composite score (genre count × 0.4 + mood count × 0.4 + energy range × 2.0). This rewards breadth but does not account for whether a mix of genres actually sounds good together.
+- The valence term in the scorer is hardcoded to a target of 0.70, which silently steers all recommendations toward emotionally positive songs regardless of what the user asked for. This was a known design flaw carried forward from the original project.
 
 ---
 
-## 4. Data
+## Testing Summary
 
-Describe your dataset.
+**Automated tests (`pytest`):** 2 unit tests covering the `Recommender.recommend` and `Recommender.explain_recommendation` methods. Both pass. The tests use a two-song in-memory catalog so they run in under a second without reading from disk.
 
-- How many songs are in `data/songs.csv`
-- Did you add or remove any songs
-- What kinds of genres or moods are represented
-- Whose taste does this data mostly reflect
+**16-profile benchmark (Reliability tab):** Covers 4 standard profiles (pop/happy, lofi/chill, rock/intense, pop/sad) and 12 edge cases: a mood not in the catalog, an energy conflict (high-energy + lofi), an out-of-range energy value of 1.5, wrong capitalisation on genre/mood, an absent genre (metal), an empty profile, and 6 profiles exercising the newer scoring dimensions (preferred decade, instrumentalness, liveness). All 16 profiles produce consistent results across 3 runs. Average top score: ~7.8. Average genre spread per run: 2.1 genres.
 
----
+**What worked:** The scorer handles missing preferences cleanly (`.get(key) is not None` guards prevent crashes when the LLM returns `null` for a field). Consistency is perfect — the content-based scorer is deterministic, so identical inputs always produce identical outputs.
 
-## 5. Strengths
+**What didn't:** The agent's tool-use loop was unreliable across model versions. `llama-3.3-70b-versatile` occasionally generated function calls in a non-standard XML format (`<function=name>{...}</function>`) instead of JSON, causing a `400` error from the API. The Groq-specific tool-use model (`llama3-groq-70b-8192-tool-use-preview`) was decommissioned mid-development. The fix was to return to `llama-3.3-70b-versatile` with a simplified system prompt that avoids explicitly naming the tool-calling pattern, which reduced the formatting failures.
 
-Where does your recommender work well
-
-You can think about:
-- Situations where the top results "felt right"
-- Particular user profiles it served well
-- Simplicity or transparency benefits
+**What I learned:** Reliability in AI systems is not just about whether the model gives a good answer — it is about whether the plumbing between the model and your code holds together across different inputs and model updates. A model that worked yesterday can be decommissioned tomorrow.
 
 ---
 
-## 6. Limitations and Bias
+## Reflection and Ethics
 
-Where does your recommender struggle
+**Limitations and biases:**
+The catalog is too small for the recommendations to be meaningful over repeated use. Genre and mood labels are exact-match only — a user who types "hip-hop" gets zero genre points if the catalog uses "hip-hop" but they typed "rap." The valence hardcode described above is the most significant hidden bias: any user who prefers darker or more melancholic music is penalized on every single recommendation without any indication that this is happening.
 
-Some prompts:
-- Does it ignore some genres or moods
-- Does it treat all users as if they have the same taste shape
-- Is it biased toward high energy or one genre by default
-- How could this be unfair if used in a real product
+**Potential misuse:**
+A recommendation system built on explicit preference labels is easy to game — a malicious actor could manipulate the catalog data to ensure their song always appears at the top by setting its numeric features to match the most common user profiles. At scale, this is how playlist stuffing works on real streaming platforms. The mitigation in this system is transparency: every score and every reason is printed alongside the recommendation, making it obvious if something is inflated.
 
----
+**What surprised me in testing:**
+The most surprising result was the empty-profile case. With no preferences provided, the system still returned a ranked list with Coffee Shop Stories in first place. It ranked first not because it is a good recommendation for anyone, but because its valence (0.71) was closest to the hardcoded target of 0.70. The system looked confident even when it had nothing to work from. That is the kind of silent failure that would be invisible to a real user and very hard to catch without deliberately testing it.
 
-## 7. Evaluation
+**Collaboration with AI during this project:**
 
-How did you check your system
+The most helpful contribution from AI (Claude) during this project was migrating the tool-use agent from the Anthropic SDK format to Groq's OpenAI-compatible format. The tool definitions, conversation history structure, and function response format are all different between the two APIs, and having those translated correctly in one pass — including the `_deep_dict` helper for converting proto types from the Gemini SDK — saved significant debugging time.
 
-Examples:
-- You tried multiple user profiles and wrote down whether the results matched your expectations
-- You compared your simulation to what a real app like Spotify or YouTube tends to recommend
-- You wrote tests for your scoring logic
-
-You do not need a numeric metric, but if you used one, explain what it measures.
-
----
-
-## 8. Future Work
-
-If you had more time, how would you improve this recommender
-
-Examples:
-
-- Add support for multiple users and "group vibe" recommendations
-- Balance diversity of songs instead of always picking the closest match
-- Use more features, like tempo ranges or lyric themes
-
----
-
-## 9. Personal Reflection
-
-A few sentences about what you learned:
-
-- What surprised you about how your system behaved
-- How did building this change how you think about real music recommenders
-- Where do you think human judgment still matters, even if the model seems "smart"
-
-
-Pictures:
-
-### Baseline — pop / happy / energy 0.8 (original scorer, max 9.5)
-![Baseline pop/happy/0.8 terminal output showing top 5 recommendations scored out of 9.5](pictures/Screenshot%202026-04-15%20at%201.28.59%20AM.png)
-
-### Baseline 2 — pop / happy / 0.85 and Baseline 3 — lofi / chill / acoustic
-![VS Code terminal showing baseline 2 pop/happy results and start of lofi/chill profile](pictures/Screenshot%202026-04-15%20at%201.41.11%20AM.png)
-
-### Baseline 3 — lofi / chill / acoustic and Baseline 4 — rock / intense
-![Terminal output for lofi chill acoustic profile and rock intense profile](pictures/Screenshot%202026-04-15%20at%201.41.18%20AM.png)
-
-### Baseline 4 — rock / intense and ADV 1 — mood 'sad' not in catalog
-![Rock intense results and start of adversarial profile with missing mood label](pictures/Screenshot%202026-04-15%20at%201.41.25%20AM.png)
-
-### ADV 1 — missing mood and ADV 2 — high energy lofi conflict
-![ADV 1 sad mood scoring zero on mood dimension and ADV 2 lofi genre with energy 0.9](pictures/Screenshot%202026-04-15%20at%201.41.30%20AM.png)
-
-### ADV 2 — lofi energy conflict and ADV 3 — out-of-range energy 1.5
-![ADV 2 showing lofi filter bubble and ADV 3 showing negative energy scores from out-of-range input](pictures/Screenshot%202026-04-15%20at%201.41.34%20AM.png)
-
-### ADV 3 — out-of-range energy and ADV 4 — wrong capitalisation
-![ADV 3 energy 1.5 results and ADV 4 showing Pop/Happy capitalisation breaking genre and mood match](pictures/Screenshot%202026-04-15%20at%201.41.38%20AM.png)
-
-### ADV 4 — capitalisation fix and ADV 5 — genre 'metal' absent from catalog
-![ADV 4 after case-insensitive fix and ADV 5 showing metal genre with hardcoded valence bias](pictures/Screenshot%202026-04-15%20at%201.41.41%20AM.png)
-
-### ADV 5 — metal/angry results and ADV 6 — empty profile
-![ADV 5 metal angry profile and start of ADV 6 empty profile ranked only by hardcoded valence](pictures/Screenshot%202026-04-15%20at%201.41.45%20AM.png)
-
-### ADV 6 — empty profile (valence-only ranking)
-![ADV 6 empty profile showing all songs scored purely by proximity to hardcoded valence target 0.70](pictures/Screenshot%202026-04-15%20at%201.41.48%20AM.png)
+The clearest instance where AI suggestions were flawed was the model selection for the Groq agent. The first suggestion (`gemini-1.5-flash`) returned a 404 because the installed SDK version used an incompatible API endpoint. The second suggestion (`gemini-2.0-flash`) had a free-tier quota of exactly zero. The third suggestion (`gemini-2.0-flash-lite`) also had zero quota. After switching to Groq, `llama3-groq-70b-8192-tool-use-preview` was suggested as the tool-use model — and it had already been decommissioned. Each of these failures required looking at the actual API error, not accepting the suggestion at face value. The lesson is that AI-generated model names and API details go stale quickly and always need to be verified against current provider documentation.

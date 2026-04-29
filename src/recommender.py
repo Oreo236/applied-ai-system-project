@@ -18,11 +18,11 @@ class Song:
     valence: float
     danceability: float
     acousticness: float
-    popularity: int
-    release_decade: int
-    detailed_mood: str
-    instrumentalness: float
-    liveness: float
+    popularity: int = 50
+    release_decade: int = 2000
+    detailed_mood: str = ""
+    instrumentalness: float = 0.0
+    liveness: float = 0.0
 
 @dataclass
 class UserProfile:
@@ -92,14 +92,14 @@ def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
         reasons.append(f"matched mood: {song['mood']}")
 
     # Energy proximity — squared distance, weight 4.0 (doubled from 2.0 to amplify continuous mismatch)
-    if "energy" in user_prefs:
+    if user_prefs.get("energy") is not None:
         energy_sim = 1 - (song["energy"] - user_prefs["energy"]) ** 2
         score += energy_sim * 4.0
         reasons.append(f"energy {song['energy']:.2f} vs your target {user_prefs['energy']:.2f}")
 
     # Acousticness proximity — squared distance, weight 1.5
     # likes_acoustic=True targets 0.80, False targets 0.15
-    if "likes_acoustic" in user_prefs:
+    if user_prefs.get("likes_acoustic") is not None:
         target_acoustic = 0.80 if user_prefs["likes_acoustic"] else 0.15
         acoustic_sim = 1 - (song["acousticness"] - target_acoustic) ** 2
         score += acoustic_sim * 1.5
@@ -112,7 +112,7 @@ def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
     reasons.append(f"valence {song['valence']:.2f}")
 
     # Popularity affinity — user preference key: "likes_popular" (bool), weight 1.5
-    if "likes_popular" in user_prefs:
+    if user_prefs.get("likes_popular") is not None:
         likes_popular = user_prefs["likes_popular"]
         if likes_popular:
             score += (song["popularity"] / 100) * 1.5
@@ -124,7 +124,7 @@ def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
         )
 
     # Decade match — user preference key: "preferred_decade" (int), weight 1.0 / 0.5
-    if "preferred_decade" in user_prefs:
+    if user_prefs.get("preferred_decade") is not None:
         preferred_decade = user_prefs["preferred_decade"]
         decade_diff = abs(song["release_decade"] - preferred_decade)
         if decade_diff == 0:
@@ -136,13 +136,13 @@ def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
         )
 
     # Detailed mood match — user preference key: "detailed_mood" (str), weight 2.0
-    if "detailed_mood" in user_prefs:
+    if user_prefs.get("detailed_mood") is not None:
         if song["detailed_mood"].lower() == user_prefs["detailed_mood"].lower():
             score += 2.0
             reasons.append(f"matched detailed mood: {song['detailed_mood']}")
 
     # Instrumentalness proximity — user preference key: "likes_instrumental" (bool), weight 1.0
-    if "likes_instrumental" in user_prefs:
+    if user_prefs.get("likes_instrumental") is not None:
         likes_instrumental = user_prefs["likes_instrumental"]
         target = 0.85 if likes_instrumental else 0.10
         score += (1 - (song["instrumentalness"] - target) ** 2) * 1.0
@@ -152,7 +152,7 @@ def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
         )
 
     # Liveness proximity — user preference key: "likes_live" (bool), weight 0.5
-    if "likes_live" in user_prefs:
+    if user_prefs.get("likes_live") is not None:
         likes_live = user_prefs["likes_live"]
         target = 0.75 if likes_live else 0.05
         score += (1 - (song["liveness"] - target) ** 2) * 0.5
